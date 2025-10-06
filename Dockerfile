@@ -12,4 +12,4 @@ EXPOSE 8080
 
 ENV NAME World
 
-CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8080", "header:app"]
+CMD ["gunicorn", "--workers", "2", "--timeout", "120", "--bind", "0.0.0.0:8080", "header:app"]
