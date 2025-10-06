@@ -2,12 +2,21 @@ from flask import Flask, request, jsonify, send_file, url_for
 import yt_dlp
 import os
 import re
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 
 DOWNLOAD_FOLDER = 'downloads'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        "error": "Not Found",
+        "message": f"The requested URL {request.path} was not found on this server."
+    }), 404
 
 @app.route('/')
 def index():
@@ -45,9 +54,34 @@ def get_info():
 
         return jsonify({
             "title": info.get('title', 'No Title'),
-            "thumbnail": info.get('thumbnail', ''),
+            "thumbnail": url_for('proxy_thumbnail', video_id=info.get('id'), _external=True),
             "formats": available_formats
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/thumbnail/<video_id>')
+def proxy_thumbnail(video_id):
+    try:
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        ydl_opts = {'quiet': True, 'skip_download': True}
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+        
+        thumbnail_url = info.get('thumbnail')
+        if not thumbnail_url:
+            return jsonify({"error": "Thumbnail not found"}), 404
+
+        response = requests.get(thumbnail_url)
+        response.raise_for_status()
+
+        return send_file(
+            BytesIO(response.content),
+            mimetype=response.headers['Content-Type']
+        )
+    except yt_dlp.utils.DownloadError:
+        return jsonify({"error": "Invalid video ID"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
