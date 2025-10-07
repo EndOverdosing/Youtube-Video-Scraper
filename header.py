@@ -38,6 +38,9 @@ def get_info():
         'quiet': True,
         'user_agent': USER_AGENT,
     }
+    if os.path.exists('cookies.txt'):
+        ydl_opts['cookiefile'] = 'cookies.txt'
+        
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -74,6 +77,8 @@ def proxy_thumbnail(video_id):
             'skip_download': True,
             'user_agent': USER_AGENT,
         }
+        if os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -113,6 +118,8 @@ def download_video():
             'quiet': True,
             'user_agent': USER_AGENT,
         }
+        if os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=True)
