@@ -11,7 +11,38 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 DOWNLOAD_FOLDER = 'downloads'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+# Enhanced headers and user agent
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+def get_ydl_opts(extra_opts=None):
+    """Generate yt-dlp options with proper headers and authentication"""
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'user_agent': USER_AGENT,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+                'player_skip': ['webpage', 'configs']
+            }
+        },
+        'http_headers': {
+            'User-Agent': USER_AGENT,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-us,en;q=0.5',
+            'Sec-Fetch-Mode': 'navigate',
+        }
+    }
+    
+    # Add cookies if available
+    if os.path.exists('cookies.txt'):
+        opts['cookiefile'] = 'cookies.txt'
+    
+    # Merge extra options
+    if extra_opts:
+        opts.update(extra_opts)
+    
+    return opts
 
 @app.errorhandler(404)
 def not_found(error):
@@ -34,14 +65,9 @@ def get_info():
     if not video_url:
         return jsonify({"error": "URL parameter is missing"}), 400
 
-    ydl_opts = {
-        'quiet': True,
-        'user_agent': USER_AGENT,
-    }
-    if os.path.exists('cookies.txt'):
-        ydl_opts['cookiefile'] = 'cookies.txt'
-        
     try:
+        ydl_opts = get_ydl_opts()
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
 
@@ -65,6 +91,14 @@ def get_info():
             "thumbnail": url_for('proxy_thumbnail', video_id=info.get('id'), _external=True),
             "formats": available_formats
         })
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if '429' in error_msg or 'bot' in error_msg.lower():
+            return jsonify({
+                "error": "YouTube rate limit or bot detection",
+                "message": "Please add authentication cookies to bypass YouTube's bot detection. See README for instructions."
+            }), 429
+        return jsonify({"error": error_msg}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -72,13 +106,7 @@ def get_info():
 def proxy_thumbnail(video_id):
     try:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
-        ydl_opts = {
-            'quiet': True,
-            'skip_download': True,
-            'user_agent': USER_AGENT,
-        }
-        if os.path.exists('cookies.txt'):
-            ydl_opts['cookiefile'] = 'cookies.txt'
+        ydl_opts = get_ydl_opts({'skip_download': True})
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -87,15 +115,15 @@ def proxy_thumbnail(video_id):
         if not thumbnail_url:
             return jsonify({"error": "Thumbnail not found"}), 404
 
-        response = requests.get(thumbnail_url)
+        response = requests.get(thumbnail_url, headers={'User-Agent': USER_AGENT})
         response.raise_for_status()
 
         return send_file(
             BytesIO(response.content),
-            mimetype=response.headers['Content-Type']
+            mimetype=response.headers.get('Content-Type', 'image/jpeg')
         )
     except yt_dlp.utils.DownloadError:
-        return jsonify({"error": "Invalid video ID"}), 404
+        return jsonify({"error": "Invalid video ID or access denied"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -111,15 +139,13 @@ def download_video():
         quality_num = re.sub(r'\D', '', quality)
         output_template = os.path.join(DOWNLOAD_FOLDER, '%(title)s - %(height)sp.%(ext)s')
         
-        ydl_opts = {
+        extra_opts = {
             'format': f'bestvideo[height<={quality_num}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': output_template,
             'merge_output_format': 'mp4',
-            'quiet': True,
-            'user_agent': USER_AGENT,
         }
-        if os.path.exists('cookies.txt'):
-            ydl_opts['cookiefile'] = 'cookies.txt'
+        
+        ydl_opts = get_ydl_opts(extra_opts)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=True)
@@ -130,6 +156,14 @@ def download_video():
 
         return send_file(filename, as_attachment=True, download_name=os.path.basename(filename))
 
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if '429' in error_msg or 'bot' in error_msg.lower():
+            return jsonify({
+                "error": "YouTube rate limit or bot detection",
+                "message": "Authentication cookies required"
+            }), 429
+        return jsonify({"error": error_msg}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

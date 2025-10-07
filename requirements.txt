@@ -1,4 +1,4 @@
 Flask
-yt-dlp
+yt-dlp>=2024.3.10
 gunicorn
 requests

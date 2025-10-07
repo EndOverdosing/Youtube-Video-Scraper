@@ -4,12 +4,11 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-COPY . /app
-
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-EXPOSE 8080
+COPY . /app
 
-ENV NAME World
+EXPOSE 8080
 
 CMD ["gunicorn", "--workers", "2", "--timeout", "120", "--bind", "0.0.0.0:8080", "header:app"]
