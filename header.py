@@ -11,6 +11,8 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 DOWNLOAD_FOLDER = 'downloads'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
@@ -32,7 +34,10 @@ def get_info():
     if not video_url:
         return jsonify({"error": "URL parameter is missing"}), 400
 
-    ydl_opts = {'quiet': True}
+    ydl_opts = {
+        'quiet': True,
+        'user_agent': USER_AGENT,
+    }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -64,7 +69,11 @@ def get_info():
 def proxy_thumbnail(video_id):
     try:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
-        ydl_opts = {'quiet': True, 'skip_download': True}
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'user_agent': USER_AGENT,
+        }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -102,6 +111,7 @@ def download_video():
             'outtmpl': output_template,
             'merge_output_format': 'mp4',
             'quiet': True,
+            'user_agent': USER_AGENT,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
