@@ -11,7 +11,6 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 DOWNLOAD_FOLDER = 'downloads'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# Enhanced headers and user agent
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 def get_ydl_opts(extra_opts=None):
@@ -22,8 +21,9 @@ def get_ydl_opts(extra_opts=None):
         'user_agent': USER_AGENT,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],
-                'player_skip': ['webpage', 'configs']
+                'player_client': ['ios', 'android', 'web'],
+                'player_skip': ['webpage'],
+                'skip': ['hls', 'dash']
             }
         },
         'http_headers': {
@@ -31,14 +31,15 @@ def get_ydl_opts(extra_opts=None):
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-us,en;q=0.5',
             'Sec-Fetch-Mode': 'navigate',
-        }
+        },
+        'format_sort': ['res', 'ext:mp4:m4a'],
+        'geo_bypass': True,
+        'age_limit': None,
     }
     
-    # Add cookies if available
     if os.path.exists('cookies.txt'):
         opts['cookiefile'] = 'cookies.txt'
     
-    # Merge extra options
     if extra_opts:
         opts.update(extra_opts)
     
@@ -73,16 +74,27 @@ def get_info():
 
         available_formats = []
         resolutions = set()
+        
         for f in info.get('formats', []):
-            if f.get('vcodec') != 'none' and f.get('acodec') == 'none' and f.get('ext') == 'mp4' and f.get('height'):
+            if f.get('height') and f.get('vcodec') != 'none':
                 height = f.get('height')
-                if height not in resolutions:
+                if height not in resolutions and height >= 144:
                     resolutions.add(height)
                     download_url = url_for('download_video', url=video_url, quality=f"{height}p", _external=True)
                     available_formats.append({
                         "quality": f"{height}p",
-                        "download_url": download_url
+                        "download_url": download_url,
+                        "format_id": f.get('format_id')
                     })
+        
+        if not available_formats:
+            common_resolutions = [2160, 1440, 1080, 720, 480, 360]
+            for height in common_resolutions:
+                download_url = url_for('download_video', url=video_url, quality=f"{height}p", _external=True)
+                available_formats.append({
+                    "quality": f"{height}p",
+                    "download_url": download_url
+                })
         
         available_formats.sort(key=lambda x: int(re.sub(r'\D', '', x['quality'])), reverse=True)
 
