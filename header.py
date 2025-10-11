@@ -5,6 +5,7 @@ import re
 import requests
 from io import BytesIO
 import uuid
+from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 
 app = Flask(__name__)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
@@ -73,12 +74,21 @@ def index():
     })
 
 def get_bot_detection_error_response():
-    param_prefix = '&' if request.query_string else '?'
-    example_url = f"{request.url}{param_prefix}cookies=<PASTE_YOUR_COOKIE_DATA_HERE>"
+    parsed_url = urlparse(request.url)
+    query_params = parse_qs(parsed_url.query)
+    
+    query_params['cookies'] = ['<PASTE_YOUR_ENCODED_COOKIE_DATA_HERE>']
+    
+    new_query_string = urlencode(query_params, doseq=True)
+    example_url = urlunparse(
+        (parsed_url.scheme, parsed_url.netloc, parsed_url.path, 
+         parsed_url.params, new_query_string, parsed_url.fragment)
+    )
+
     return jsonify({
         "error": "YouTube rate limit or bot detection",
         "message": "YouTube is blocking requests from this server. To bypass this, you can provide your YouTube cookies.",
-        "instructions": "1. In your browser, install an extension to export your YouTube cookies in Netscape format (e.g., 'Get cookies.txt LOCALLY'). 2. Copy the entire contents of the exported text file. 3. Add the copied text as a 'cookies' query parameter to the API URL.",
+        "instructions": "1. In your browser, install an extension to export your YouTube cookies in Netscape format (e.g., 'Get cookies.txt LOCALLY'). 2. Copy the entire contents of the exported text file. 3. URL-encode the text (e.g., using urlencoder.org). 4. Add the encoded text as a 'cookies' query parameter to the API URL.",
         "example": example_url,
         "privacy_notice": "Your cookies are used only for this single request to bypass the block and are not stored on the server."
     }), 429
