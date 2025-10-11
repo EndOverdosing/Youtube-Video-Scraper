@@ -23,58 +23,24 @@ A simple Flask API to fetch YouTube video information and provide downloadable l
 This is the easiest and most reliable way to run the application.
 
 1.  Make sure you have Docker and Docker Compose installed.
-2.  Create a `docker-compose.yml` file (provided above) in the same directory as your other files.
+2.  Save the `docker-compose.yml` file in your project directory.
 3.  Run the application from your terminal:
     ```bash
     docker-compose up --build
     ```
 The API will be available at `http://localhost:8080`. Downloaded videos will appear in a `downloads` folder in your project directory.
 
-### Running for Local Development (Without Docker)
-
-1.  Install Python 3.8+ and ffmpeg on your system.
-2.  Install the required Python packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  Run the application with Gunicorn:
-    ```bash
-    gunicorn --workers 2 --timeout 120 --bind 0.0.0.0:8080 "header:app"
-    ```
-
 ## Endpoints
 
-### `/`
-
-*   **Method:** GET
-*   **Description:** Checks if the API is running.
+(All endpoints are relative to your base URL, e.g., `http://localhost:8080`)
 
 ### `/api/info`
 
 *   **Method:** GET
 *   **Query Parameters:**
     *   `url` (required) - The full YouTube video URL.
-    *   `cookies` (optional) - Your YouTube browser cookies in Netscape format to bypass bot detection.
-*   **Description:** Returns video title, thumbnail, and a list of available formats with download links.
-*   **Success Response Example:**
-    ```json
-    {
-      "title": "Rick Astley - Never Gonna Give You Up (Official Music Video)",
-      "thumbnail": "http://127.0.0.1:8080/api/thumbnail/dQw4w9WgXcQ",
-      "formats": [
-        {
-          "quality": "1080p",
-          "download_url": "http://127.0.0.1:8080/api/download?quality=1080p&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ",
-          "format_id": "137"
-        },
-        {
-          "quality": "720p",
-          "download_url": "http://127.0.0.1:8080/api/download?quality=720p&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ",
-          "format_id": "136"
-        }
-      ]
-    }
-    ```
+    *   `cookies` (optional) - Your **URL-encoded** YouTube browser cookies.
+*   **Description:** Returns video title, thumbnail, and a list of available formats.
 
 ### `/api/download`
 
@@ -82,37 +48,34 @@ The API will be available at `http://localhost:8080`. Downloaded videos will app
 *   **Query Parameters:**
     *   `url` (required) - The YouTube video URL.
     *   `quality` (required) - Desired video quality (e.g., `1080p`, `720p`).
-    *   `cookies` (optional) - Your YouTube browser cookies in Netscape format.
-*   **Description:** Downloads the video in the requested resolution. The final file will be an MP4 with both video and audio merged.
-*   **Response:** Returns the video file as an attachment.
+    *   `cookies` (optional) - Your **URL-encoded** YouTube browser cookies.
+*   **Description:** Downloads the video in the requested resolution as a merged MP4 file.
 
-### `/api/thumbnail/<video_id>`
-
-*   **Method:** GET
-*   **Description:** A proxy for the video's thumbnail image. This is used internally by the `/api/info` endpoint.
-
+---
 
 ## Bypassing Bot Detection (429 Error)
 
-If you use the API frequently, YouTube may temporarily block your server's IP address, resulting in a `429` error. To solve this, you can provide your browser's YouTube cookies.
+If you use the API frequently, YouTube may temporarily block your server, resulting in a `429` error. To solve this, you can provide your browser's cookies.
 
-#### Error Response Example:
-```json
-{
-    "error": "YouTube rate limit or bot detection",
-    "message": "YouTube is blocking requests from this server. To bypass this, you can provide your YouTube cookies.",
-    "instructions": "1. In your browser, install an extension to export your YouTube cookies in Netscape format (e.g., 'Get cookies.txt LOCALLY'). 2. Copy the entire contents of the exported text file. 3. Add the copied text as a 'cookies' query parameter to the API URL.",
-    "example": "http://127.0.0.1:8080/api/info?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&cookies=<PASTE_YOUR_COOKIE_DATA_HERE>",
-    "privacy_notice": "Your cookies are used only for this single request to bypass the block and are not stored on the server."
-}
-```
+### How to Get and Use Your Cookies
 
-### How to Get Your Cookies
+1.  **Install a Cookie Exporter Extension:**
+    *   Use a browser extension that can export cookies in the **Netscape HTTP Cookie File** format.
+    *   Recommended: **Get cookies.txt LOCALLY** for [Chrome](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) or [Firefox](https://addons.mozilla.org/en-US/firefox/addon/get-cookies-txt-locally/).
 
-1.  Install a browser extension that can export cookies in the **Netscape HTTP Cookie File** format. A good choice is **Get cookies.txt LOCALLY** for [Chrome](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) or [Firefox](https://addons.mozilla.org/en-US/firefox/addon/get-cookies-txt-locally/).
-2.  Navigate to `youtube.com`.
-3.  Click the extension's icon and export the cookies.
-4.  Copy the entire text content from the downloaded `.txt` file.
-5.  You can paste this text directly into the `cookies` parameter. URL encoding is often handled by browsers/clients, but if you run into issues, try URL-encoding the text first.
+2.  **Export Cookies for YouTube:**
+    *   Navigate to `youtube.com`.
+    *   Click the extension's icon and export/download the cookies file (`cookies.txt`).
+
+3.  **Copy the Contents:**
+    *   Open the downloaded `cookies.txt` file and copy the **entire text content**.
+
+4.  **IMPORTANT: URL-Encode the Cookie Data:**
+    *   Go to a site like [**urlencoder.org**](https://www.urlencoder.org/).
+    *   Paste the copied cookie text into the box and click **Encode**.
+    *   This converts special characters (like `#`, spaces, and newlines) into a format safe for URLs (e.g., `%23`, `%20`).
+
+5.  **Use the Encoded String in the API:**
+    *   Append the final, encoded string to your API request as the `cookies` parameter.
 
 **Privacy Note:** The provided cookies are written to a temporary file that is used for this single request and is **immediately deleted** after the request is complete. They are never stored permanently on the server.
