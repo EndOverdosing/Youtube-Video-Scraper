@@ -4,17 +4,27 @@ import os
 import re
 import requests
 from io import BytesIO
+import uuid
 
 app = Flask(__name__)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 
 DOWNLOAD_FOLDER = 'downloads'
+TEMP_FOLDER = 'temp_cookies'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def get_ydl_opts(extra_opts=None):
-    """Generate yt-dlp options with proper headers and authentication"""
+def create_temp_cookie_file(cookie_string):
+    if not cookie_string:
+        return None
+    filename = os.path.join(TEMP_FOLDER, f"cookies_{uuid.uuid4()}.txt")
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(cookie_string)
+    return filename
+
+def get_ydl_opts(extra_opts=None, cookie_file=None):
     opts = {
         'quiet': True,
         'no_warnings': True,
@@ -37,7 +47,9 @@ def get_ydl_opts(extra_opts=None):
         'age_limit': None,
     }
     
-    if os.path.exists('cookies.txt'):
+    if cookie_file:
+        opts['cookiefile'] = cookie_file
+    elif os.path.exists('cookies.txt'):
         opts['cookiefile'] = 'cookies.txt'
     
     if extra_opts:
@@ -60,14 +72,29 @@ def index():
         "example": f"{request.url_root}api/info?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     })
 
+def get_bot_detection_error_response():
+    param_prefix = '&' if request.query_string else '?'
+    example_url = f"{request.url}{param_prefix}cookies=<PASTE_YOUR_COOKIE_DATA_HERE>"
+    return jsonify({
+        "error": "YouTube rate limit or bot detection",
+        "message": "YouTube is blocking requests from this server. To bypass this, you can provide your YouTube cookies.",
+        "instructions": "1. In your browser, install an extension to export your YouTube cookies in Netscape format (e.g., 'Get cookies.txt LOCALLY'). 2. Copy the entire contents of the exported text file. 3. Add the copied text as a 'cookies' query parameter to the API URL.",
+        "example": example_url,
+        "privacy_notice": "Your cookies are used only for this single request to bypass the block and are not stored on the server."
+    }), 429
+
 @app.route('/api/info')
 def get_info():
     video_url = request.args.get('url')
+    cookie_string = request.args.get('cookies')
+
     if not video_url:
         return jsonify({"error": "URL parameter is missing"}), 400
 
+    temp_cookie_file = None
     try:
-        ydl_opts = get_ydl_opts()
+        temp_cookie_file = create_temp_cookie_file(cookie_string)
+        ydl_opts = get_ydl_opts(cookie_file=temp_cookie_file)
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -105,14 +132,14 @@ def get_info():
         })
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
-        if '429' in error_msg or 'bot' in error_msg.lower():
-            return jsonify({
-                "error": "YouTube rate limit or bot detection",
-                "message": "Please add authentication cookies to bypass YouTube's bot detection. See README for instructions."
-            }), 429
-        return jsonify({"error": error_msg}), 500
+        if '429' in error_msg or 'bot' in error_msg.lower() or 'unavailable' in error_msg.lower():
+            return get_bot_detection_error_response()
+        return jsonify({"error": "yt-dlp error", "message": error_msg}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An unexpected error occurred", "message": str(e)}), 500
+    finally:
+        if temp_cookie_file and os.path.exists(temp_cookie_file):
+            os.remove(temp_cookie_file)
 
 @app.route('/api/thumbnail/<video_id>')
 def proxy_thumbnail(video_id):
@@ -143,13 +170,16 @@ def proxy_thumbnail(video_id):
 def download_video():
     video_url = request.args.get('url')
     quality = request.args.get('quality')
+    cookie_string = request.args.get('cookies')
 
     if not video_url or not quality:
         return jsonify({"error": "Missing url or quality parameter"}), 400
 
+    temp_cookie_file = None
+    downloaded_file_path = None
     try:
         quality_num = re.sub(r'\D', '', quality)
-        output_template = os.path.join(DOWNLOAD_FOLDER, '%(title)s - %(height)sp.%(ext)s')
+        output_template = os.path.join(DOWNLOAD_FOLDER, '%(title)s - %(height)sp - %(id)s.%(ext)s')
         
         extra_opts = {
             'format': f'bestvideo[height<={quality_num}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -157,27 +187,28 @@ def download_video():
             'merge_output_format': 'mp4',
         }
         
-        ydl_opts = get_ydl_opts(extra_opts)
+        temp_cookie_file = create_temp_cookie_file(cookie_string)
+        ydl_opts = get_ydl_opts(extra_opts, cookie_file=temp_cookie_file)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=True)
-            filename = ydl.prepare_filename(info)
+            downloaded_file_path = ydl.prepare_filename(info)
         
-        if not os.path.exists(filename):
+        if not downloaded_file_path or not os.path.exists(downloaded_file_path):
             return jsonify({"error": "Failed to download or locate the file"}), 500
 
-        return send_file(filename, as_attachment=True, download_name=os.path.basename(filename))
+        return send_file(downloaded_file_path, as_attachment=True, download_name=os.path.basename(downloaded_file_path))
 
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
-        if '429' in error_msg or 'bot' in error_msg.lower():
-            return jsonify({
-                "error": "YouTube rate limit or bot detection",
-                "message": "Authentication cookies required"
-            }), 429
-        return jsonify({"error": error_msg}), 500
+        if '429' in error_msg or 'bot' in error_msg.lower() or 'unavailable' in error_msg.lower():
+            return get_bot_detection_error_response()
+        return jsonify({"error": "yt-dlp error", "message": error_msg}), 500
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An unexpected error occurred", "message": str(e)}), 500
+    finally:
+        if temp_cookie_file and os.path.exists(temp_cookie_file):
+            os.remove(temp_cookie_file)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
