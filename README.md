@@ -23,8 +23,8 @@ A simple Flask API to fetch YouTube video information and provide downloadable l
 This is the easiest and most reliable way to run the application.
 
 1.  Make sure you have Docker and Docker Compose installed.
-2.  Create a `docker-compose.yml` file (provided below) in the same directory as your other files.
-3.  Run the application:
+2.  Create a `docker-compose.yml` file (provided above) in the same directory as your other files.
+3.  Run the application from your terminal:
     ```bash
     docker-compose up --build
     ```
@@ -91,7 +91,6 @@ The API will be available at `http://localhost:8080`. Downloaded videos will app
 *   **Method:** GET
 *   **Description:** A proxy for the video's thumbnail image. This is used internally by the `/api/info` endpoint.
 
----
 
 ## Bypassing Bot Detection (429 Error)
 
@@ -114,27 +113,6 @@ If you use the API frequently, YouTube may temporarily block your server's IP ad
 2.  Navigate to `youtube.com`.
 3.  Click the extension's icon and export the cookies.
 4.  Copy the entire text content from the downloaded `.txt` file.
-5.  URL-encode the copied text (many online tools can do this) and append it to your API request as the `cookies` parameter.
+5.  You can paste this text directly into the `cookies` parameter. URL encoding is often handled by browsers/clients, but if you run into issues, try URL-encoding the text first.
 
 **Privacy Note:** The provided cookies are written to a temporary file that is used for this single request and is **immediately deleted** after the request is complete. They are never stored permanently on the server.
-```
-
----
-
-### `docker-compose.yml`
-
-(Create this new file in your project's root directory)
-
-```yaml
-version: '3.8'
-
-services:
-  yt-dlp-api:
-    build: .
-    container_name: yt-dlp-api
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./downloads:/app/downloads
-    restart: unless-stopped
-```
