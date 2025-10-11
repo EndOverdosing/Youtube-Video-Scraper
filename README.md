@@ -1,4 +1,4 @@
-![Rylox Logo](https://applescoop.org/image/wallpapers/mac/vibrant-sunset-in-the-forest-mountains-landscapes-nature-8k-top-rated-most-downloaded-free-download-wallpapers-for-macbook-pro-and-macbook-air-and-microsoft-windows-desktop-pcs-4k-07-12-2024-1733638654-hd-wallpaper.webp)
+![Banner](https://applescoop.org/image/wallpapers/mac/vibrant-sunset-in-the-forest-mountains-landscapes-nature-8k-top-rated-most-downloaded-free-download-wallpapers-for-macbook-pro-and-macbook-air-and-microsoft-windows-desktop-pcs-4k-07-12-2024-1733638654-hd-wallpaper.webp)
 
 # YouTube Video Info & Download API
 
@@ -106,3 +106,35 @@ If you use the API frequently, YouTube may temporarily block your server's IP ad
     "example": "http://127.0.0.1:8080/api/info?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&cookies=<PASTE_YOUR_COOKIE_DATA_HERE>",
     "privacy_notice": "Your cookies are used only for this single request to bypass the block and are not stored on the server."
 }
+```
+
+### How to Get Your Cookies
+
+1.  Install a browser extension that can export cookies in the **Netscape HTTP Cookie File** format. A good choice is **Get cookies.txt LOCALLY** for [Chrome](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) or [Firefox](https://addons.mozilla.org/en-US/firefox/addon/get-cookies-txt-locally/).
+2.  Navigate to `youtube.com`.
+3.  Click the extension's icon and export the cookies.
+4.  Copy the entire text content from the downloaded `.txt` file.
+5.  URL-encode the copied text (many online tools can do this) and append it to your API request as the `cookies` parameter.
+
+**Privacy Note:** The provided cookies are written to a temporary file that is used for this single request and is **immediately deleted** after the request is complete. They are never stored permanently on the server.
+```
+
+---
+
+### `docker-compose.yml`
+
+(Create this new file in your project's root directory)
+
+```yaml
+version: '3.8'
+
+services:
+  yt-dlp-api:
+    build: .
+    container_name: yt-dlp-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./downloads:/app/downloads
+    restart: unless-stopped
+```
