@@ -33,8 +33,6 @@ def get_ydl_opts(extra_opts=None, cookie_file=None):
         'extractor_args': {
             'youtube': {
                 'player_client': ['ios', 'android', 'web'],
-                'player_skip': ['webpage'],
-                'skip': ['hls', 'dash']
             }
         },
         'http_headers': {
@@ -45,7 +43,6 @@ def get_ydl_opts(extra_opts=None, cookie_file=None):
         },
         'format_sort': ['res', 'ext:mp4:m4a'],
         'geo_bypass': True,
-        'age_limit': None,
     }
     
     if cookie_file:
@@ -86,9 +83,9 @@ def get_bot_detection_error_response():
     )
 
     return jsonify({
-        "error": "YouTube rate limit or bot detection",
-        "message": "YouTube is blocking requests from this server. To bypass this, you can provide your YouTube cookies.",
-        "instructions": "1. In your browser, install an extension to export your YouTube cookies in Netscape format (e.g., 'Get cookies.txt LOCALLY'). 2. Copy the entire contents of the exported text file. 3. URL-encode the text (e.g., using urlencoder.org). 4. Add the encoded text as a 'cookies' query parameter to the API URL.",
+        "error": "YouTube rate limit, bot detection, or age restriction",
+        "message": "YouTube is blocking requests from this server. This can happen due to rate-limiting or if the video is age-restricted. To bypass this, you must provide your YouTube browser cookies.",
+        "instructions": "1. In your browser (while logged into YouTube), install an extension to export your cookies in Netscape format (e.g., 'Get cookies.txt LOCALLY'). 2. Copy the entire contents of the exported text file. 3. URL-encode the text (e.g., using urlencoder.org). 4. Add the encoded text as a 'cookies' query parameter to the API URL.",
         "example": example_url,
         "privacy_notice": "Your cookies are used only for this single request to bypass the block and are not stored on the server."
     }), 429
@@ -117,21 +114,16 @@ def get_info():
                 height = f.get('height')
                 if height not in resolutions and height >= 144:
                     resolutions.add(height)
-                    download_url = url_for('download_video', url=video_url, quality=f"{height}p", _external=True)
+                    download_params = {'url': video_url, 'quality': f"{height}p"}
+                    if cookie_string:
+                        download_params['cookies'] = cookie_string
+                    
+                    download_url = url_for('download_video', **download_params, _external=True)
                     available_formats.append({
                         "quality": f"{height}p",
                         "download_url": download_url,
                         "format_id": f.get('format_id')
                     })
-        
-        if not available_formats:
-            common_resolutions = [2160, 1440, 1080, 720, 480, 360]
-            for height in common_resolutions:
-                download_url = url_for('download_video', url=video_url, quality=f"{height}p", _external=True)
-                available_formats.append({
-                    "quality": f"{height}p",
-                    "download_url": download_url
-                })
         
         available_formats.sort(key=lambda x: int(re.sub(r'\D', '', x['quality'])), reverse=True)
 
@@ -141,10 +133,12 @@ def get_info():
             "formats": available_formats
         })
     except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        if '429' in error_msg or 'bot' in error_msg.lower() or 'unavailable' in error_msg.lower():
+        error_msg = str(e).lower()
+        # FIX: Added checks for age-restriction errors.
+        block_patterns = ['429', 'bot', 'unavailable', 'sign in', 'age-restricted', 'confirm your age']
+        if any(p in error_msg for p in block_patterns):
             return get_bot_detection_error_response()
-        return jsonify({"error": "yt-dlp error", "message": error_msg}), 500
+        return jsonify({"error": "yt-dlp error", "message": str(e)}), 500
     except Exception as e:
         return jsonify({"error": "An unexpected error occurred", "message": str(e)}), 500
     finally:
@@ -154,25 +148,17 @@ def get_info():
 @app.route('/api/thumbnail/<video_id>')
 def proxy_thumbnail(video_id):
     try:
-        video_url = f"https://www.youtube.com/watch?v={video_id}"
-        ydl_opts = get_ydl_opts({'skip_download': True})
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-        
-        thumbnail_url = info.get('thumbnail')
-        if not thumbnail_url:
-            return jsonify({"error": "Thumbnail not found"}), 404
-
+        thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
         response = requests.get(thumbnail_url, headers={'User-Agent': USER_AGENT})
-        response.raise_for_status()
+        if response.status_code != 200 or "image/gif" in response.headers.get('Content-Type', ''):
+             thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+             response = requests.get(thumbnail_url, headers={'User-Agent': USER_AGENT})
+             response.raise_for_status()
 
         return send_file(
             BytesIO(response.content),
             mimetype=response.headers.get('Content-Type', 'image/jpeg')
         )
-    except yt_dlp.utils.DownloadError:
-        return jsonify({"error": "Invalid video ID or access denied"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -210,10 +196,12 @@ def download_video():
         return send_file(downloaded_file_path, as_attachment=True, download_name=os.path.basename(downloaded_file_path))
 
     except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        if '429' in error_msg or 'bot' in error_msg.lower() or 'unavailable' in error_msg.lower():
+        error_msg = str(e).lower()
+        # FIX: Added checks for age-restriction errors.
+        block_patterns = ['429', 'bot', 'unavailable', 'sign in', 'age-restricted', 'confirm your age']
+        if any(p in error_msg for p in block_patterns):
             return get_bot_detection_error_response()
-        return jsonify({"error": "yt-dlp error", "message": error_msg}), 500
+        return jsonify({"error": "yt-dlp error", "message": str(e)}), 500
     except Exception as e:
         return jsonify({"error": "An unexpected error occurred", "message": str(e)}), 500
     finally:
