@@ -134,7 +134,6 @@ def get_info():
         })
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e).lower()
-        # FIX: Added checks for age-restriction errors.
         block_patterns = ['429', 'bot', 'unavailable', 'sign in', 'age-restricted', 'confirm your age']
         if any(p in error_msg for p in block_patterns):
             return get_bot_detection_error_response()
@@ -197,7 +196,6 @@ def download_video():
 
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e).lower()
-        # FIX: Added checks for age-restriction errors.
         block_patterns = ['429', 'bot', 'unavailable', 'sign in', 'age-restricted', 'confirm your age']
         if any(p in error_msg for p in block_patterns):
             return get_bot_detection_error_response()
