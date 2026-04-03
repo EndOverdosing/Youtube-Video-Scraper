@@ -1,12 +1,7 @@
 FROM node:20-slim
 
 RUN apt-get update && apt-get install -y \
-    python3 \
-    ffmpeg \
-    curl \
-    wget \
-    ca-certificates \
-    chromium \
+    python3 ffmpeg curl chromium \
     --no-install-recommends \
     && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     -o /usr/local/bin/yt-dlp \
