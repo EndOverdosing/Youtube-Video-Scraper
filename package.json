@@ -1,9 +1,9 @@
 {
     "name": "youtube-video-scraper",
     "version": "1.0.0",
-    "main": "index.js",
+    "main": "headers.js",
     "scripts": {
-        "start": "node index.js"
+        "start": "node headers.js"
     },
     "dependencies": {
         "express": "^4.18.2",

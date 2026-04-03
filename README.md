@@ -44,7 +44,7 @@ Requires Node.js 20+, ffmpeg, and yt-dlp installed and on your PATH.
 
 ```bash
 npm install
-node index.js
+node headers.js
 ```
 
 The API will be available at `http://localhost:8080`.
