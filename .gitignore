@@ -47,3 +47,9 @@ htmlcov/
 .ropeproject/
 
 *.egg-info/
+
+node_modules/
+
+downloads/
+
+cookies.txt
