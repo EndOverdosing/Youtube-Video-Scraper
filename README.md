@@ -1,12 +1,3 @@
----
-title: Youtube Video Scraper
-emoji: 🎬
-colorFrom: red
-colorTo: gray
-sdk: docker
-pinned: false
----
-
 ![Banner](https://applescoop.org/image/wallpapers/mac/vibrant-sunset-in-the-forest-mountains-landscapes-nature-8k-top-rated-most-downloaded-free-download-wallpapers-for-macbook-pro-and-macbook-air-and-microsoft-windows-desktop-pcs-4k-07-12-2024-1733638654-hd-wallpaper.webp)
 
 # YouTube Video Info & Download API
